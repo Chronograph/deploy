@@ -2,12 +2,8 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { Redirect } from 'react-router-dom';
 
-import {
-  fetchProjects,
-  projectsDeleteFailure,
-  projectsDeleteRequest,
-  projectsDeleteSuccess
-} from '../../state/projects/projectsActions';
+import { fetchProjects, deleteProject } from '../../state/projects/actions';
+import { createToast } from "../../state/alert/alertActions";
 import ProjectService from '../../services/Project';
 
 import AlertErrorValidation from '../../components/AlertErrorValidation';
@@ -20,8 +16,9 @@ import PanelBody from '../../components/PanelBody';
 import Modal from '../../components/Modal';
 import Layout from "../../components/Layout";
 import Container from "../../components/Container";
-import Sidebar from './Sidebar';
-import { createToast } from "../../state/alert/alertActions";
+import Sidebar from './components/Sidebar';
+import ProjectHeading from '../../components/ProjectHeading/ProjectHeading';
+import DeleteProjectModal from './components/DeleteProjectModal';
 
 class ProjectEditPage extends React.Component {
   state = {
@@ -33,6 +30,7 @@ class ProjectEditPage extends React.Component {
       deploy_on_push: '',
     },
     errors: [],
+    isDeleteProjectModalVisible: false,
   };
 
   componentDidMount() {
@@ -117,7 +115,7 @@ class ProjectEditPage extends React.Component {
             return previous.concat(errorResponse[key][0]);
           }, []);
 
-        this.setState({errors: errors});
+        this.setState({ errors: errors });
       });
   };
 
@@ -127,31 +125,22 @@ class ProjectEditPage extends React.Component {
   handleProjectDeleteClick = () => {
     const { dispatch } = this.props;
     const { project } = this.state;
-    const projectService = new ProjectService();
 
-    dispatch(projectsDeleteRequest());
-
-    projectService
-      .delete(project.id)
-      .then(response => {
-          $('#project-delete-modal').modal('hide');
-
-          this.setState({isDeleted: true});
-
-          dispatch(projectsDeleteSuccess(project.id));
-
-          dispatch(createToast('Project deleted successfully.'));
-        },
-        error => {
-          dispatch(projectsDeleteFailure());
-        });
+    dispatch(deleteProject(project.id));
   };
 
   /**
-   * Handle show project delete modal.
+   * @returns {void}
    */
-  modalProjectDeleteClick = () => {
-    $('#project-delete-modal').modal('show');
+  handleShowDeleteProjectModalClick = () => {
+    this.setState({ isDeleteProjectModalVisible: true });
+  };
+
+  /**
+   * @returns {void}
+   */
+  handleHideDeleteProjectModalClick = () => {
+    this.setState({ isDeleteProjectModalVisible: false });
   };
 
   render = () => {
@@ -160,6 +149,7 @@ class ProjectEditPage extends React.Component {
       isUpdated,
       project,
       errors,
+      isDeleteProjectModalVisible,
     } = this.state;
 
     const {
@@ -181,17 +171,13 @@ class ProjectEditPage extends React.Component {
 
     return (
       <Layout project={projects.items[project_id]}>
-        <div className="content">
-          <Container fluid>
-            <div className="heading">
-              <h2>General Settings</h2>
-            </div>
-          </Container>
+        <ProjectHeading project={ project } />
 
+        <div className="content">
           <Container fluid>
             <div className="row">
               <Grid xs={12} sm={3}>
-                <Sidebar project={project} />
+                <Sidebar project={ project } />
               </Grid>
 
               <Grid xs={12} sm={9}>
@@ -208,8 +194,8 @@ class ProjectEditPage extends React.Component {
                         className="form-control"
                         name="name"
                         type="text"
-                        onChange={this.handleInputChange}
-                        value={this.state.project.name}
+                        onChange={ this.handleInputChange }
+                        value={ this.state.project.name }
                       />
                     </div>
 
@@ -220,8 +206,8 @@ class ProjectEditPage extends React.Component {
                             type="checkbox"
                             name="deploy_on_push"
                             value="1"
-                            onChange={this.handleInputChange}
-                            checked={this.state.project.deploy_on_push}
+                            onChange={ this.handleInputChange }
+                            checked={ this.state.project.deploy_on_push }
                           /> Deploy when code is pushed to
                         </label>
                       </div>
@@ -230,7 +216,7 @@ class ProjectEditPage extends React.Component {
                     <div className="form-group">
                       <Button
                         color="primary"
-                        onClick={this.handleProjectUpdateClick}
+                        onClick={ this.handleProjectUpdateClick }
                       >Save</Button>
                     </div>
                   </PanelBody>
@@ -245,7 +231,7 @@ class ProjectEditPage extends React.Component {
                     <p>Once you delete this project, there is no going back.</p>
                     <Button
                       color="danger"
-                      onClick={this.modalProjectDeleteClick}
+                      onClick={ this.handleShowDeleteProjectModalClick }
                     >Delete Project</Button>
                   </PanelBody>
                 </Panel>
@@ -253,16 +239,11 @@ class ProjectEditPage extends React.Component {
             </div>
           </Container>
 
-          <Modal
-            id="project-delete-modal"
-            title={'Delete Project'}
-            buttons={[
-              {text: 'Cancel', onPress: () => $('#project-delete-modal').modal('hide')},
-              {text: 'Delete Project', onPress: () => this.handleProjectDeleteClick()}
-            ]}
-          >
-            Are you sure you want to delete this project?
-          </Modal>
+          <DeleteProjectModal
+            isVisible={ isDeleteProjectModalVisible }
+            onModalHide={ this.handleHideDeleteProjectModalClick }
+            onDeleteProjectClick={ this.handleProjectDeleteClick }
+          />
         </div>
       </Layout>
     )

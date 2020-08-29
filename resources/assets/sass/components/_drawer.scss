@@ -18,7 +18,7 @@
   }
 
   ul ul {
-    padding-left: 15px;
+    padding-left: 0;
 
     a {
       padding-left: 15px;
@@ -47,6 +47,7 @@
   .fa {
     width: 25px;
     display: inline-block;
+    color: #959da5;
   }
 
   @media (max-width: 768px) {

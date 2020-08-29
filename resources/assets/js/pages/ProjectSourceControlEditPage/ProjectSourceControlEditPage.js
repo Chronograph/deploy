@@ -1,10 +1,9 @@
 import React from 'react';
 import { connect } from 'react-redux';
-import { Link, Redirect } from 'react-router-dom';
+import { NavLink, Redirect } from 'react-router-dom';
 
-import { createToast } from '../../state/alert/alertActions';
-
-import ProjectService from '../../services/Project';
+import { fetchAccountProviders } from '../../state/accountProviders/actions';
+import {fetchProject, updateProject} from "../../state/project/actions";
 import AccountProviderService from '../../services/AccountProvider';
 
 import AlertErrorValidation from '../../components/AlertErrorValidation';
@@ -15,8 +14,9 @@ import PanelTitle from '../../components/PanelTitle';
 import PanelBody from '../../components/PanelBody';
 import TextField from '../../components/TextField';
 import Layout from "../../components/Layout";
-import {fetchProject, updateProject} from "../../state/project/actions";
 import Container from "../../components/Container";
+import ProjectHeading from '../../components/ProjectHeading/ProjectHeading';
+import Grid from '../../components/Grid';
 
 class ProjectSourceControlEditPage extends React.Component {
   state = {
@@ -26,7 +26,6 @@ class ProjectSourceControlEditPage extends React.Component {
       repository: '',
       provider_id: 0,
     },
-    grantedProviders: [],
   };
 
   componentDidMount() {
@@ -44,11 +43,11 @@ class ProjectSourceControlEditPage extends React.Component {
       dispatch(fetchProject(project_id));
     }
 
+    dispatch(fetchAccountProviders());
+
     this.setState({
       edit: this.setEditState(project),
     });
-
-    this.loadAccountProviders();
   }
 
   componentWillReceiveProps(nextProps, nextContext) {
@@ -77,25 +76,6 @@ class ProjectSourceControlEditPage extends React.Component {
   };
 
   /**
-   * Retrieves account providers.
-   */
-  loadAccountProviders = () => {
-    const accountProviderService = new AccountProviderService;
-
-    accountProviderService
-      .index('/api/account-providers')
-      .then(response => {
-        let providers = response.data.filter(provider => {
-          return provider.deploy_access_token;
-        });
-
-        this.setState({
-          grantedProviders: providers
-        });
-      });
-  };
-
-  /**
    * Handle project's source control input change.
    *
    * @param {object} event
@@ -110,7 +90,8 @@ class ProjectSourceControlEditPage extends React.Component {
         ...state.edit,
         [name]: value
       };
-      return {edit: project}
+
+      return { edit: project }
     });
   };
 
@@ -128,55 +109,60 @@ class ProjectSourceControlEditPage extends React.Component {
   };
 
   render() {
-    const { project } = this.props;
-    const { grantedProviders } = this.state;
+    const { project, accountProviders } = this.props;
 
     return (
-      <Layout project={project.item}>
+      <Layout project={ project.item }>
+        <ProjectHeading project={ project.item } />
+
         <div className="content">
           <Container fluid>
-            <div className="heading">
-              <h2>Source Control</h2>
-            </div>
-          </Container>
-
-          <Container fluid>
             <div className="row">
-              <div className="col-xs-12 col-sm-3">
+              <Grid xs={ 12 } sm={ 3 }>
                 <Panel>
                   <PanelHeading>
                     <PanelTitle>Project settings</PanelTitle>
                   </PanelHeading>
 
                   <div className="list-group">
-                    <Link to={'/projects/' + project.item.id + '/edit'} className="list-group-item">General settings</Link>
-                    <Link to={'/projects/' + project.item.id + '/source-control/edit'} className="list-group-item">Source control</Link>
+                    <NavLink
+                      to={ '/projects/' + project.item.id + '/settings' }
+                      className="list-group-item"
+                      activeClassName="active"
+                      exact
+                    >General settings</NavLink>
+                    <NavLink
+                      to={ '/projects/' + project.item.id + '/settings/source-control' }
+                      className="list-group-item"
+                      activeClassName="active"
+                      exact
+                    >Source control</NavLink>
                   </div>
                 </Panel>
-              </div>
+              </Grid>
 
-              <div className="col-xs-12 col-sm-9">
+              <Grid xs={ 12 } sm={ 9 }>
                 <Panel>
-                <PanelHeading>
-                  <PanelTitle>Source Control</PanelTitle>
-                </PanelHeading>
+                  <PanelHeading>
+                    <PanelTitle>Source Control</PanelTitle>
+                  </PanelHeading>
                   <PanelBody>
-                    {project.errors.length ? <AlertErrorValidation errors={project.errors} /> : ''}
+                    { project.errors.length ? <AlertErrorValidation errors={ project.errors } /> : '' }
 
                     <div className="form-group">
                       <label>Providers</label>
 
-                      {grantedProviders.map(grantedProvider =>
-                        <div key={grantedProvider.id}>
-                          <label htmlFor={grantedProvider.name}>
+                      {(accountProviders.items || []).map((grantedProvider) =>
+                        <div key={ grantedProvider.id }>
+                          <label htmlFor={ grantedProvider.name }>
                             <input
                               name="provider_id"
                               type="radio"
-                              value={grantedProvider.id}
-                              id={grantedProvider.name}
-                              onChange={this.handleInputChange}
-                              checked={parseInt(this.state.edit.provider_id) === grantedProvider.id}
-                            /> {grantedProvider.name}
+                              value={ grantedProvider.id }
+                              id={ grantedProvider.name }
+                              onChange={ this.handleInputChange }
+                              checked={ parseInt(this.state.edit.provider_id) === grantedProvider.id }
+                            /> { grantedProvider.name }
                           </label>
                         </div>
                       )}
@@ -186,9 +172,9 @@ class ProjectSourceControlEditPage extends React.Component {
                       <TextField
                         id="repository"
                         label="Repository"
-                        onChange={this.handleInputChange}
+                        onChange={ this.handleInputChange }
                         name="repository"
-                        value={this.state.edit.repository}
+                        value={ this.state.edit.repository }
                         placeholder="user/repository"
                       />
                     </div>
@@ -197,19 +183,19 @@ class ProjectSourceControlEditPage extends React.Component {
                       <TextField
                         id="branch"
                         label="Branch"
-                        onChange={this.handleInputChange}
+                        onChange={ this.handleInputChange }
                         name="branch"
-                        value={this.state.edit.branch}
+                        value={ this.state.edit.branch }
                       />
                     </div>
 
                     <Button
                       color="primary"
-                      onClick={this.handleClick}
-                    >{project.isUpdating ? 'Saving...' : 'Save'}</Button>
+                      onClick={ this.handleClick }
+                    >{ project.isUpdating ? 'Saving...' : 'Save' }</Button>
                   </PanelBody>
                 </Panel>
-              </div>
+              </Grid>
             </div>
           </Container>
         </div>
@@ -221,9 +207,8 @@ class ProjectSourceControlEditPage extends React.Component {
 const mapStateToProps = state => {
   return {
     project: state.project,
+    accountProviders: state.accountProviders,
   };
 };
 
-export default connect(
-  mapStateToProps
-)(ProjectSourceControlEditPage);
+export default connect(mapStateToProps)(ProjectSourceControlEditPage);

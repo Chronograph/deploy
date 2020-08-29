@@ -2,28 +2,36 @@
 
 namespace Deploy\Processors;
 
+use Deploy\Contracts\Processors\ProcessorInterface;
+use Deploy\Events\ProcessorErrorEvent;
 use Deploy\Events\ServerConnectionTested;
 use Deploy\Models\Server;
 use Deploy\Ssh\Client;
 use Exception;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Contracts\Events\Dispatcher;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 
-class ServerConnectionProcessor extends AbstractProcessor
+class ServerConnectionProcessor extends AbstractProcessor implements ProcessorInterface
 {
-    /**
-     * @var \Deploy\Models\Server
-     */
+    /** @var Server */
     public $server;
 
+    public function __construct()
+    {
+        //
+    }
+
     /**
-     * Instantiate.
-     * 
-     * @return void
+     * Set server.
+     *
+     * @param Server $server
+     * @return self
      */
-    public function __construct(Server $server)
+    public function setServer(Server $server)
     {
         $this->server = $server;
+
+        return $this;
     }
 
     /**
@@ -35,6 +43,7 @@ class ServerConnectionProcessor extends AbstractProcessor
         
         try {
             $client = new Client($this->getHost($this->server));
+
             $client = $client
                 ->setTimeout(30)
                 ->getProcess();
@@ -46,10 +55,13 @@ class ServerConnectionProcessor extends AbstractProcessor
             }
             
             $successful = true;
-        } catch (ProcessFailedException $e) {
-            Log::error($e->getMessage());
-        } catch (Exception $e) {
-            Log::error($e->getMessage());
+        } catch (ProcessFailedException | Exception $exception) {
+            event(new ProcessorErrorEvent(
+                'Server connection test issue',
+                $this->server->project_id,
+                $this->server,
+                $exception
+            ));
         }
         
         $server = Server::find($this->server->id);

@@ -1,3 +1,7 @@
+.phpunit.result.cache
 /node_modules
 /vendor
+/coverage
 npm-debug.log
+composer.lock
+phpunit.xml

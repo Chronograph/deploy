@@ -3,6 +3,7 @@
 namespace Deploy\Http\Requests;
 
 use Deploy\Models\Provider;
+use Deploy\ProviderOauth\ProviderOauthFactory;
 use Deploy\ProviderOauthManager;
 use Deploy\ProviderRepositoryManager;
 use Exception;
@@ -11,6 +12,16 @@ use Illuminate\Support\Facades\Log;
 
 class ProjectRequest extends FormRequest
 {
+    /** @var ProviderOauthManager */
+    private $providerOauthManager;
+
+    /**
+     * @param ProviderOauthManager $providerOauthManager
+     */
+    public function __construct(ProviderOauthManager $providerOauthManager) {
+        $this->providerOauthManager = $providerOauthManager;
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -59,15 +70,28 @@ class ProjectRequest extends FormRequest
     {
         $providerId = $this->request->get('provider_id');
         $repository = $this->request->get('repository');
-        $user = auth()->user();
+
         $provider = Provider::find($providerId);
+
+        if (!$provider instanceof Provider) {
+            return false;
+        }
 
         $response = [];
 
         try {
-            $providerOauth = new ProviderOauthManager($provider, $user);
+            $providerOauth = ProviderOauthFactory::create($provider->friendly_name);
+
+            $user = auth()->user();
+
+            $providerOauthManager = $this->providerOauthManager
+                ->setProvider($providerOauth)
+                ->setUser($user);
+
             $providerRepository = new ProviderRepositoryManager();
-            $diver = $providerRepository->driver($provider->friendly_name, $providerOauth->getAccessToken());
+
+            $diver = $providerRepository->driver($provider->friendly_name, $providerOauthManager->getAccessToken());
+
             $response = $diver->repository($repository);
         } catch (Exception $e) {
              Log::info($e->getMessage());

@@ -11,10 +11,12 @@ import Modal from '../../components/Modal';
 import Panel from '../../components/Panel';
 import PanelHeading from '../../components/PanelHeading';
 import PanelTitle from '../../components/PanelTitle';
-import FoldersTable from './FoldersTable';
+import FoldersTable from './components/FoldersTable';
 import Layout from "../../components/Layout";
 import Container from "../../components/Container";
 import {fetchProject} from "../../state/project/actions";
+import ProjectHeading from '../../components/ProjectHeading/ProjectHeading';
+import RemoveLinkedFolderModal from './components/RemoveLinkedFolderModal';
 
 class ProjectLinkedFolderPage extends React.Component {
   state = {
@@ -26,7 +28,6 @@ class ProjectLinkedFolderPage extends React.Component {
   componentDidMount() {
     const {
       dispatch,
-      project,
       match: {
         params: {
           project_id,
@@ -49,18 +50,17 @@ class ProjectLinkedFolderPage extends React.Component {
   }
 
   /**
-   * Handle show folder remove modal.
-   *
    * @param {object} folder
    */
   modalLinkedFolderRemoveShow = (folder) => {
-    this.setState({folder: folder});
-
-    $('#linked-folder-remove-modal').modal('show');
+    this.setState({
+      folder: folder,
+      isRemoveLinkedFolderModalVisible: true,
+    });
   };
 
   /**
-   * Handle project folder delete.
+   * @returns {void}
    */
   handleLinkedFolderRemoveClick = () => {
     const { folder } = this.state;
@@ -74,7 +74,7 @@ class ProjectLinkedFolderPage extends React.Component {
 
         this.removeFolder(folder.id);
 
-        $('#linked-folder-remove-modal').modal('hide');
+        this.setState({ isRemoveLinkedFolderModalVisible: false });
       },
       error => {
         alert('Could not delete linked folder');
@@ -106,7 +106,7 @@ class ProjectLinkedFolderPage extends React.Component {
       return (
         <FoldersTable
           folders={folders}
-          modalLinkedFolderRemoveShow={this.modalLinkedFolderRemoveShow}
+          modalLinkedFolderRemoveShow={ this.modalLinkedFolderRemoveShow }
         />
       )
     }
@@ -119,8 +119,6 @@ class ProjectLinkedFolderPage extends React.Component {
   };
 
   /**
-   * Render folders content.
-   *
    * @param {bool} isFetching
    * @param {object} project
    * @param {array} folders
@@ -143,40 +141,42 @@ class ProjectLinkedFolderPage extends React.Component {
 	        </div>
             <PanelTitle>Linked Folders</PanelTitle>
           </PanelHeading>
-          {this.renderFoldersTable(folders)}
+          { this.renderFoldersTable(folders) }
         </Panel>
       </>
     )
   };
 
+  /**
+   * @returns {void}
+   */
+  handleHideRemoveLinkedFolderModal = () => {
+    this.setState({ isRemoveLinkedFolderModalVisible: false });
+  }
+
   render() {
     const { project } = this.props;
-    const { folders, isFetching } = this.state;
+
+    const { 
+      folders,
+      isFetching,
+      isRemoveLinkedFolderModalVisible,
+     } = this.state;
 
     return (
       <Layout project={project.item}>
-        <div className="content">
-          <div className="container-fluid heading">
-            <h2>Linked Folders</h2>
-          </div>
+        <ProjectHeading project={ project.item } />
 
+        <div className="content">
           <Container fluid>
-            {this.renderFoldersContent(isFetching, project.item, folders)}
+            { this.renderFoldersContent(isFetching, project.item, folders) }
           </Container>
 
-          <Modal
-            id="linked-folder-remove-modal"
-            title="Remove Linked Folder"
-            buttons={[
-              {text: 'Cancel', onPress: () => $('#linked-folder-remove-modal').modal('hide')},
-              {text: 'Remove Linked Folder', onPress: () => this.handleLinkedFolderRemoveClick()}
-            ]}
-          >
-            Are you sure you want to remove this link folder from the project?
-            <br/>
-            Note: Your folder will not be removed from the server. This will
-            only prevent a symlink during your next deploy.
-          </Modal>
+          <RemoveLinkedFolderModal
+            isVisible={ isRemoveLinkedFolderModalVisible }
+            onModalHide={ this.handleHideRemoveLinkedFolderModal }
+            onRemoveLinkedFolderClick={ this.handleLinkedFolderRemoveClick }
+          />
         </div>
       </Layout>
     )

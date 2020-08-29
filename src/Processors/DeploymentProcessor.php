@@ -14,51 +14,64 @@ use Deploy\ProviderRepository\Commit;
 use Deploy\Deployment\Sequences;
 use Deploy\Deployment\CommandParser;
 use DateTime;
+use Deploy\Contracts\Processors\ProcessorInterface;
+use Deploy\Events\ProcessorErrorEvent;
+use Deploy\ProviderOauth\ProviderOauthFactory;
 use Exception;
-use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 
-class DeploymentProcessor extends AbstractProcessor
+class DeploymentProcessor extends AbstractProcessor implements ProcessorInterface
 {
-    
-    /**
-     * @var \Deploy\Models\Deployment
-     */
+    /** @var Deployment */
     private $deployment;
     
-    /**
-     * @var \Deploy\Models\Project
-     */
+    /** @var Project */
     private $project;
     
-    /**
-     * @var string
-     */
+    /** @var string */
     private $time;
     
-    /**
-     * @var array
-     */
+    /** @var array */
     private $output = [];
     
-    /**
-     * @var \Deploy\Deployment\Scripts
-     */
+    /** @var Scripts */
     private $deploymentScripts;
     
     /**
-     * Instantiate constructor.
-     *
-     * @param  \Deploy\Models\Deployment $deployment
-     * @param  \Deploy\Models\Project $project
+     * @param ProviderOauthManager $providerOauthManager
      * @return void
      */
-    public function __construct($deployment, $project)
+    public function __construct(ProviderOauthManager $providerOauthManager)
     {
-        $this->deploymentScripts = new Scripts($project);
-        $this->deployment = $deployment;
-        $this->project = $project;
+        $this->providerOauthManager = $providerOauthManager;
         $this->time = (new DateTime())->format('YmdHis');
+    }
+
+    /**
+     * Set project.
+     *
+     * @param Project $project
+     * @return self
+     */
+    public function setProject($project)
+    {
+        $this->project = $project;
+        $this->deploymentScripts = new Scripts($project);
+
+        return $this;
+    }
+
+    /**
+     * Set deployment associated with project.
+     *
+     * @param Project $project
+     * @return self
+     */
+    public function setDeployment($deployment)
+    {
+        $this->deployment = $deployment;
+
+        return $this;
     }
 
     /**
@@ -82,20 +95,16 @@ class DeploymentProcessor extends AbstractProcessor
                     break;
                 }
             }
-        } catch (ProcessFailedException $e) {
+        } catch (ProcessFailedException | Exception $e) {
             $status = Deployment::FAILED;
             
-            Log::info($e->getTraceAsString());
-        } catch (Exception $e) {
-            $status = Deployment::FAILED;
-            
-            Log::info($e->getTraceAsString());
+            event(new ProcessorErrorEvent('Deployment issue', $this->deployment->project_id, $this->deployment, $e));
         }
         
         $this->updateRemainingProcessesAsCancelled($this->deployment);
         $this->updateDeploymentAsFinished($status);
     }
-    
+
     /**
      * Run through each process in a sequence. Gather exit codes and output.
      *
@@ -228,7 +237,7 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Calculate duration from step progress.
      *
-     * @param  array $deployment
+     * @param Deployment $deployment
      * @return integer
      */
     public function calculateDuration($deployment)
@@ -245,7 +254,7 @@ class DeploymentProcessor extends AbstractProcessor
     /**
      * Return process' parsed script.
      *
-     * @param  array $process
+     * @param Process $process
      * @return string
      */
     public function getScript($process)
@@ -314,7 +323,15 @@ class DeploymentProcessor extends AbstractProcessor
      */
     protected function getAccessToken()
     {
-        $oauth = new ProviderOauthManager($this->project->provider, $this->project->user);
+        $provider = $this->project
+            ->provider
+            ->friendly_name;
+
+        $providerOauth = ProviderOauthFactory::create($provider);
+
+        $oauth = $this->providerOauthManager
+            ->setProvider($providerOauth)
+            ->setUser($this->project->user);
     
         return $oauth->getAccessToken();
     }

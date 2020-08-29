@@ -14,9 +14,10 @@ import Loader from '../../components/Loader';
 import Panel from '../../components/Panel';
 import PanelBody from '../../components/PanelBody';
 import TextField from '../../components/TextField';
-import EnvironmentServersTable from './EnvironmentServersTable';
+import EnvironmentServersTable from './components/EnvironmentServersTable';
 import { buildAlertFromResponse } from '../../utils/alert';
 import Layout from "../../components/Layout";
+import ProjectHeading from '../../components/ProjectHeading/ProjectHeading';
 
 class ProjectEnvironmentUnlockPage extends React.Component {
   constructor(props) {
@@ -29,7 +30,7 @@ class ProjectEnvironmentUnlockPage extends React.Component {
         servers: [],
       },
       errors: [],
-      syncStatus: '',
+      status: {},
       unlocked: false
     };
 
@@ -48,8 +49,10 @@ class ProjectEnvironmentUnlockPage extends React.Component {
     const {
       dispatch,
       project,
-      match,
+      match
     } = this.props;
+
+    const projectId = match.params.project_id;
 
     this.setState(prevState => {
       const environment = {
@@ -62,21 +65,37 @@ class ProjectEnvironmentUnlockPage extends React.Component {
       return {environment: environment};
     });
 
-    dispatch(fetchProject(match.params.project_id));
+    dispatch(fetchProject(projectId));
 
-    Echo.private('project.' + project.id)
-      .listen('.Deploy\\Events\\EnvironmentSyncing', (e) => {
-        let environment = e.environment.id;
-        this.setState({syncStatus: 'Syncing'});
-      })
-      .listen('.Deploy\\Events\\EnvironmentSynced', (e) => {
-        let environment = e.environment.id;
-        this.setState({syncStatus: 'Synced'});
+    if (Echo !== null) {
+      Echo.private('project.' + projectId)
+        .listen('.Deploy\\Events\\EnvironmentSyncing', (e) => {
+          let serverId = e.serverId;
+          let serverStatus = e.status;
 
-        setTimeout(() => {
-          this.setState({syncStatus: ''});
-        }, 300);
-      });
+          this.setState(prevState => {
+            const status = {
+              ...prevState.status,
+              [serverId]: serverStatus
+            };
+
+            return { status: status }
+          });
+        })
+        .listen('.Deploy\\Events\\EnvironmentSynced', (e) => {
+          let serverId = e.serverId;
+          let serverStatus = e.status;
+
+          this.setState(prevState => {
+            const status = {
+              ...prevState.status,
+              [serverId]: serverStatus
+            };
+
+            return { status: status }
+          });
+        });
+    }
   }
 
   /**
@@ -204,7 +223,7 @@ class ProjectEnvironmentUnlockPage extends React.Component {
     const {
       environment,
       errors,
-      syncStatus,
+      status,
       unlocked
     } = this.state;
 
@@ -214,14 +233,10 @@ class ProjectEnvironmentUnlockPage extends React.Component {
 
     if (project.isFetching) {
       return (
-        <Layout project={project.item}>
-          <div className="content">
-            <div className="container-fluid heading">
-              <h2>
-                Environment
-              </h2>
-            </div>
+        <Layout project={ project.item }>
+          <ProjectHeading project={ project.item } />
 
+          <div className="content">
             <Container fluid>
               <Loader />
             </Container>
@@ -233,14 +248,10 @@ class ProjectEnvironmentUnlockPage extends React.Component {
     if (unlocked) {
       return (
         <Layout project={project.item}>
-          <div className="content">
-            <div className="container-fluid heading">
-              <h2>
-                Environment
-              </h2>
-            </div>
+          <ProjectHeading project={ project.item } />
 
-            <div className="container-fluid">
+          <div className="content">
+            <Container fluid>
               <Alert type="warning">
                 Your environment information will be stored in an .env file on your servers.
               </Alert>
@@ -285,14 +296,14 @@ class ProjectEnvironmentUnlockPage extends React.Component {
 
                 <Grid xs={12} md={4}>
                   <EnvironmentServersTable
-                    project={project.item}
-                    syncedServers={environment.servers}
-                    syncStatus={syncStatus}
+                    project={ project.item }
+                    syncedServers={ environment.servers }
+                    status={ status }
                     onSyncServerClick={this.handleSyncServerClick}
                   />
                 </Grid>
               </div>
-            </div>
+            </Container>
           </div>
         </Layout>
       )
@@ -300,14 +311,10 @@ class ProjectEnvironmentUnlockPage extends React.Component {
 
     return (
       <Layout project={project.item}>
-        <div className="content">
-          <div className="container-fluid heading">
-            <h2>
-              Environment
-            </h2>
-          </div>
+        <ProjectHeading project={ project.item } />
 
-          <div className="container-fluid">
+        <div className="content">
+          <Container fluid>
             <Alert type="warning">
               Your environment information will be encrypted on our server using your
               chosen key. You will also have to provide your key each time you wish to
@@ -344,7 +351,7 @@ class ProjectEnvironmentUnlockPage extends React.Component {
                 >Need to reset your key?</Link>
               </PanelBody>
             </Panel>
-          </div>
+          </Container>
         </div>
       </Layout>
     )
